@@ -1,0 +1,351 @@
+{
+  "name": "Blogger Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Blogger Automation",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "tool_name"
+            },
+            {
+              "fieldLabel": "tool_url"
+            },
+            {
+              "fieldLabel": "affiliate_link"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -144,
+        -32
+      ],
+      "id": "1d33a7da-e1a5-4286-b3a4-dd6446e116aa",
+      "name": "On form submission",
+      "webhookId": "8e5e67d2-7c14-46e3-8d7a-d61c2d70882a"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.tool_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        48,
+        112
+      ],
+      "id": "7feceff1-f103-4e39-b6c5-90e3f3ef850c",
+      "name": "HTML to Markdown"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are an expert Technical Blogger and SEO Strategist. You write in perfect HTML format for Blogger. You are objective, detailed, and persuasive.\nYou are an expert Technical Blogger.\noutput ONLY raw HTML code.\n- NEVER use markdown symbols like **bold** or ## Header.\n- Use <strong> for bold text.\n- Use <h2> and <h3> for headers.\n- Use <ul> and <li> for lists.\n- Do not wrap the output in ```html``` code blocks. Just return the raw HTML string.",
+              "role": "model"
+            },
+            {
+              "content": "=I need a fully optimized blog post for the tool: \"{{ $('On form submission').item.json.tool_name }}\".\n\nHere is the content scraped from their website:\n\"\"\"{{$node[\"HTML to Markdown\"].json.data}}\"\"\"\n\n\n---\n\n### INSTRUCTIONS:\nWrite a 1,500-word blog post in HTML format.\n\n1. **SEO Meta Data:**\n   - Start with a JSON block containing: {\"title\": \"...\", \"meta_description\": \"...\", \"keywords\": [\"...\", \"...\"], \"labels\": [\"...\", \"...\"]}\n\n2. **Blog Post Structure (Use HTML tags <h2>, <h3>, <p>, <ul>, <li>, <table>):**\n   - **H1 Title:** Catchy, includes Year (2026) and Benefit.\n   - **Introduction:** What is it? Who is it for? (Hook the reader).\n   - **Key Features:** detailed bullet points.\n   - **Pricing Breakdown:** Create a strictly formatted HTML table comparing plans.\n   - **Pros & Cons:** Clear lists.\n   - **FAQ Section:** 5 questions people ask (Wrap these in <script type=\"application/ld+json\"> Schema markup for FAQPage).\n   - **Conclusion:** Final verdict + CTA button using the Affiliate Link.\n\n3. **Formatting Rules:**\n   - Use <b> for keywords (bolding).\n   - The CTA button should use this style: <a href=\"LINK\" style=\"background:#007bff; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;\">Get Started</a>\n   - Do NOT output markdown code blocks (```html). Just output the raw HTML string."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        112
+      ],
+      "id": "69cdfa26-0062-400c-9d47-6b8b4d154f2e",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CwC7N0EDc4WWArDL",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the input item\nconst item = $input.first();\n\n// 2. Extract the text safely based on your screenshot structure\n// We check multiple places where n8n might hide the answer\nconst response = item.json.content?.parts?.[0]?.text || \n                 item.json.output || \n                 item.json.text;\n\n// 3. Safety Check\nif (!response) {\n  throw new Error(\"Could not find the text response. Check the Gemini node output!\");\n}\n\n// 4. Extract JSON metadata (Title, Labels)\nconst jsonMatch = response.match(/\\{[\\s\\S]*?\\}/);\nconst metaData = jsonMatch ? JSON.parse(jsonMatch[0]) : { title: \"Draft Post\", labels: [] };\n\n// 5. Extract HTML Body (Remove the JSON part)\nconst htmlBody = jsonMatch ? response.replace(jsonMatch[0], '').trim() : response;\n\nreturn {\n  json: {\n    title: metaData.title,\n    labels: metaData.labels || [],\n    content: htmlBody\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        112
+      ],
+      "id": "b1bdf9dd-4701-4d6b-9bfe-d9d7eafaee99",
+      "name": "The Data Cleaner"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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 "
+            },
+            {
+              "name": "Accept",
+              "value": "image/png"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"inputs\": 'A high-quality digital illustration related to ' + $('On form submission').first().json.tool_name + ', demonstrating its functionality or theme. The official logo for ' + $('On form submission').first().json.tool_name + ' must be prominently incorporated into the design. Futuristic, professional style.'\n}\n}}",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        96,
+        -96
+      ],
+      "id": "43702856-1544-4822-b9a4-11a1819aabf4",
+      "name": "Image Generator"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        656,
+        -32
+      ],
+      "id": "ac76e5f9-749a-4e1b-af17-ffd3bfb074d2",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/blogger/v3/blogs/1757271632912409940/posts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_ACCESS_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"kind\": \"blogger#post\",\n  \"title\": $json.title,\n  \"content\": $json.content,\n  \"labels\": $json.labels\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1024,
+        -32
+      ],
+      "id": "691f6db7-d3cc-4942-aa44-a3cdcc3eae62",
+      "name": "Blogger Post",
+      "credentials": {
+        "gongOAuth2Api": {
+          "id": "5jy9WccTqJh5vGam",
+          "name": "Gong account"
+        },
+        "googleOAuth2Api": {
+          "id": "zlgr919bqvTHH8GD",
+          "name": "Google account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "UploadedAI-image",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1w8tPqAFd2FnQauvCt1FpEP4nkRqqYdzS",
+          "mode": "list",
+          "cachedResultName": "AI images",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1w8tPqAFd2FnQauvCt1FpEP4nkRqqYdzS"
+        },
+        "options": {
+          "simplifyOutput": false
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        320,
+        -96
+      ],
+      "id": "1c0668fa-d74d-4d6d-8e6b-a17518d0e170",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "f5lPaPm3SXl1xhQD",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get all incoming data from the Merge Node\nconst items = $input.all();\n\n// 2. Find the Image Data (Look for an item with an 'id' and 'webContentLink')\n// We search through the inputs to find the one that looks like a Google Drive file\nconst driveItem = items.find(item => item.json.id && item.json.webContentLink);\nconst driveId = driveItem ? driveItem.json.id : null;\n\n// 3. Find the Blog Text (Look for an item with a 'title' and 'content')\n// We search for the item that looks like a blog post\nconst textItem = items.find(item => item.json.title && item.json.content);\nconst title = textItem ? textItem.json.title : \"Default Title\";\nconst content = textItem ? textItem.json.content : \"Default Content\";\nconst labels = textItem ? textItem.json.labels : [];\n\n// Safety Check: Did we find the image?\nif (!driveId) {\n  throw new Error(\"Could not find Google Drive Image ID in the input. Make sure the Merge Node is connected!\");\n}\n\n// 4. Create the Styling and HTML\nconst css = \"<style>table{width:100%;border-collapse:collapse;margin:20px 0;} th,td{border:1px solid #ddd;padding:12px;} th{background-color:#f2f2f2;} img{max-width:100%;height:auto;border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,0.1);}</style>\";\n\nconst imgHtml = \"<div style='text-align:center; margin-bottom:30px;'><img src='https://drive.google.com/thumbnail?id=\" + driveId + \"&sz=w1000' alt='Blog Post Image'/></div>\";\n\nconst finalHtml = css + imgHtml + content;\n\n// 5. Output the combined result\nreturn {\n  json: {\n    title: title,\n    content: finalHtml,\n    labels: labels\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -32
+      ],
+      "id": "ff4a9471-39e5-47cc-a639-19d3ef113790",
+      "name": "Prepare Blog Post"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "HTML to Markdown",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Image Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML to Markdown": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "The Data Cleaner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The Data Cleaner": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Image Generator": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Prepare Blog Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Blog Post": {
+      "main": [
+        [
+          {
+            "node": "Blogger Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "627bf538-266e-4ce0-a59a-b77b76cfab79",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ae70bdecabd5e4ed27b702228169d6aaae7d5409ad5ca234b9692dffbafa186a"
+  },
+  "id": "_MN4eoSyHBXBgGuHCRVBG",
+  "tags": []
+}
